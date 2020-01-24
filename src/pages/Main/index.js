@@ -208,6 +208,7 @@ function Main({ navigation }) {
                 style={addCompra.chaveCompra}
                 title="dataCompra">Data Compra: </Text>
               <TextInput
+                style={addCompra.inputDataCompra}
                 editable={false}
                 defaultValue={`${dataCompra.getDate()}/${dataCompra.getMonth() + 1}/${dataCompra.getFullYear()}`}></TextInput>
               <TouchableOpacity
@@ -330,6 +331,7 @@ const estilos = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 15,
     marginLeft: 5,
+    height: 40
   },
   formComprador: {
     position: "absolute",
@@ -342,7 +344,7 @@ const estilos = StyleSheet.create({
     borderRadius: 20,
     padding: 5,
     marginTop: 5,
-    marginHorizontal: 5
+    marginHorizontal: 5,
   },
 
   cabecalho: {
@@ -406,7 +408,7 @@ const addCompra = StyleSheet.create({
 
   dataCompra: {
     width: 20,
-    height: 100
+    height: 100,
   },
 
   inputCompra: {
@@ -441,6 +443,13 @@ const addCompra = StyleSheet.create({
     padding: 8,
     borderRadius: 20,
     marginLeft: 10
+  },
+
+  inputDataCompra: {
+    color: "#000",
+    top: 0,
+    padding: 0,
+    marginTop: 0
   }
 })
 
