@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { View, Text, Picker, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import LinearGradient from 'react-native-linear-gradient'
@@ -8,6 +8,14 @@ function Profile({navigation}) {
     const [mes, setMes] = useState("none")
     const [total, setTotal] = useState(0.00)
     const [comprador, setComprador] = useState("")
+
+    async function loadCompras(Mes) {
+        const realm = await getRealm()
+    
+        const data = realm.objects('Compra')
+        setCompras([...data].reverse())
+      }
+    
     return (
         <LinearGradient colors={["#e2a79f", "#fa7f72"]} style={{ flex: 1 }}>
             <View style={estilos.selecionarMes}>
@@ -86,7 +94,6 @@ function Profile({navigation}) {
                     <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
                     <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
                     <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-                    <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
                     <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
                     <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
                 </View>

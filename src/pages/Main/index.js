@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, Picker } from 'react-native'
 import LinearGradient from 'react-native-linear-gradient'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import Modal from 'react-native-modal'
 import DateTimerPicker from '@react-native-community/datetimepicker'
 import styles from './styles'
-
-
+import getRealm from '~/services/realm'
+import { dateToString, stringToDate } from '~/Utils/tratarDatas'
+import {primeiraPrestacao, ultimaPrestacao, pegarMes} from '~/pages/Pagamento/parcelas'
 
 // import { Container } from './styles';
 
@@ -18,12 +19,93 @@ function Main({ navigation }) {
   const [produto, setProduto] = useState("")
   const [valor, setValor] = useState(0)
   const [parcelas, setParcelas] = useState(0)
-  const [primeiraParcela, setPrimeiraParcela] = useState("")
   const [showCalendar, setShowCalendar] = useState(false)
   const [buscarComprador, setBuscarComprador] = useState("")
+  const [compras, setCompras] = useState([])
 
-  function addNovaCompra() {
+  function abrirJanelaCompra() {
     setVisible(true)
+  }
+
+  async function loadCompras() {
+    const realm = await getRealm()
+
+    const data = realm.objects('Compra').slice(realm.objects('Compra').length - 6, realm.objects('Compra').length)
+    console.log(data)
+    setCompras([...data].reverse())
+  }
+
+  useEffect(() => {
+    loadCompras()
+  }, [])
+
+  function criarCompra() {
+    const compra = {
+      comprador,
+      cartao,
+      produto,
+      valor,
+      parcelas,
+      dataCompra,
+      primeiraPrestacao: primeiraPrestacao(dataCompra),
+      ultimaPrestacao: ultimaPrestacao(dataCompra, parcelas)
+    }
+
+    return compra
+  }
+
+  function mostrarCompras(compra) {
+    return (
+      <View style={styles.compra}>
+        <View style={styles.botoesCompra}>
+          <TouchableOpacity style={styles.botoesModificarCompra} onPress={() => {
+            console.log("oi")
+          }}>
+            <Icon name="edit" size={14} color="#084d6e"></Icon>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.botoesModificarCompra}>
+            <Icon name="delete" size={14} color="#084d6e"></Icon>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>{compra.comprador}</Text></Text>
+        <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>{compra.cartao}</Text></Text>
+        <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>{compra.produto}</Text></Text>
+        <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ {compra.valor}</Text></Text>
+        <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>{compra.parcelas}</Text></Text>
+        <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>{dateToString(compra.dataCompra)}</Text></Text>
+        <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>{pegarMes(compra.primeiraPrestacao)}</Text></Text>
+        <Text style={styles.produto}>Última Parcela: <Text style={styles.produtoVendido}>{pegarMes(compra.ultimaPrestacao)}</Text></Text>
+      </View>
+    )
+  }
+
+  async function saveCompra() {
+    const compra = criarCompra()
+    const data = {
+      comprador: compra.comprador,
+      cartao: compra.cartao,
+      produto: compra.produto,
+      valor: Number.parseFloat(compra.valor),
+      parcelas: compra.parcelas,
+      dataCompra: compra.dataCompra,
+      primeiraPrestacao: compra.primeiraPrestacao,
+      ultimaPrestacao: compra.ultimaPrestacao
+    }
+
+    const realm = await getRealm()
+
+    realm.write(() => {
+      realm.create('Compra', data)
+    })
+  }
+
+  async function handleAddCompra() {
+    try {
+      await saveCompra()
+      zerarCampos("")
+    } catch (e) {
+      console.log(e)
+    }
   }
 
   function zerarCampos() {
@@ -33,7 +115,6 @@ function Main({ navigation }) {
     setProduto("")
     setValor(0)
     setParcelas(0)
-    setPrimeiraParcela("")
   }
 
   function escolherData(show) {
@@ -46,10 +127,6 @@ function Main({ navigation }) {
       }} style={{ backgroundColor: "#000" }}></DateTimerPicker>
       )
     }
-  }
-
-  function selecionarCartao(cartao) {
-    setCartao(cartao)
   }
 
   return (
@@ -68,81 +145,7 @@ function Main({ navigation }) {
       </View>
       <Text style={estilos.cabecalho}>Últimas Compras Adicionadas</Text>
       <ScrollView style={styles.compras}>
-        <View style={styles.compra}>
-          <View style={styles.botoesCompra}>
-            <TouchableOpacity style={styles.botoesModificarCompra} onPress={() => {
-              console.log("oi")
-            }}>
-              <Icon name="edit" size={14} color="#084d6e"></Icon>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.botoesModificarCompra}>
-              <Icon name="delete" size={14} color="#084d6e"></Icon>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-          <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-          <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-          <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-          <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-          <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
-          <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-          <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-        </View>
-
-        <View style={styles.compra}>
-          <View style={styles.botoesCompra}>
-            <TouchableOpacity style={styles.botoesModificarCompra} onPress={() => {
-              console.log("oi")
-            }}>
-              <Icon name="edit" size={12} color="#084d6e"></Icon>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.botoesModificarCompra}>
-              <Icon name="delete" size={12} color="#084d6e"></Icon>
-            </TouchableOpacity>
-          </View>
-          <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-          <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-          <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-          <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-          <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-          <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
-          <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-          <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-        </View>
-
-
-        <View style={styles.compra}>
-          <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-          <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-          <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-          <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-          <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-          <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
-          <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-          <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-        </View>
-
-        <View style={styles.compra}>
-          <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-          <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-          <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-          <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-          <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-          <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
-          <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-          <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-        </View>
-
-        <View style={styles.compra}>
-          <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-          <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-          <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-          <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-          <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-          <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
-          <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-          <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-        </View>
+        {compras.map(mostrarCompras)}
       </ScrollView>
 
       <View style={estilos.bottomButtons}>
@@ -153,7 +156,7 @@ function Main({ navigation }) {
           <Icon name="attach-money" size={26} color={"#084d6e"} style={estilos.botoesFinais}></Icon>
         </TouchableOpacity>
         <TouchableOpacity onPress={() => {
-          addNovaCompra()
+          abrirJanelaCompra()
         }}>
           <Icon name="add" size={26} color={"#084d6e"} style={estilos.botoesFinais}></Icon>
         </TouchableOpacity>
@@ -199,7 +202,9 @@ function Main({ navigation }) {
               <TextInput
                 style={addCompra.inputCompra}
                 value={parcelas}
-                onChangeText={setParcelas}
+                onChangeText={(e) => {
+                  setParcelas(Number.parseInt(e))
+                }}
                 keyboardType={"number-pad"}
                 type={"cc-number"}></TextInput>
             </View>
@@ -243,73 +248,19 @@ function Main({ navigation }) {
                   value="Hipercard"></Picker.Item>
               </Picker>
             </View>
-            <View style={addCompra.formInformacao}>
-              <Text
-                style={addCompra.chaveCompra}
-                title="cartao">Primeira Parcela: </Text>
 
-              <Picker
-                selectedValue={primeiraParcela}
-                onValueChange={((itemValue, itemPosition) => {
-                  setPrimeiraParcela(itemValue)
-                })}
-                prompt={"Primeira Parcela"}
-                style={addCompra.selecionarCartao}
-                mode={"dropdown"}>
-                <Picker.Item
-                  label="Selecione o mês da primeira parcela"
-                  value="none"
-                ></Picker.Item>
-                <Picker.Item
-                  label="Janeiro"
-                  value="Janeiro"></Picker.Item>
-                <Picker.Item
-                  label="Fevereiro"
-                  value="Fevereiro"></Picker.Item>
-                <Picker.Item
-                  label="Março"
-                  value="Março"></Picker.Item>
-                <Picker.Item
-                  label="Abril"
-                  value="Abril"></Picker.Item>
-                <Picker.Item
-                  label="Maio"
-                  value="Maio"></Picker.Item>
-                <Picker.Item
-                  label="Junho"
-                  value="Junho"></Picker.Item>
-                <Picker.Item
-                  label="Julho"
-                  value="Julho"></Picker.Item>
-                <Picker.Item
-                  label="Agosto"
-                  value="Agosto"></Picker.Item>
-                <Picker.Item
-                  label="Setembro"
-                  value="Setembro"></Picker.Item>
-                <Picker.Item
-                  label="Outubro"
-                  value="Outubro"></Picker.Item>
-                <Picker.Item
-                  label="Novembro"
-                  value="Novembro"></Picker.Item>
-                <Picker.Item
-                  label="Dezembro"
-                  value="Dezembro"></Picker.Item>
-              </Picker>
-            </View>
           </View>
           <View style={addCompra.formBotoesFinais}>
             <TouchableOpacity onPress={() => {
-              zerarCampos()
               setVisible(false)
             }}>
               <Icon name="close" color="#990000" style={addCompra.botoesFinais}></Icon>
             </TouchableOpacity>
 
             <TouchableOpacity onPress={() => {
-              zerarCampos()
+              handleAddCompra()
               setVisible(false)
+              loadCompras()
             }}>
               <Icon name="check" color="#009900" style={addCompra.botoesFinais}></Icon>
             </TouchableOpacity>
@@ -412,14 +363,14 @@ const addCompra = StyleSheet.create({
   },
 
   inputCompra: {
-    backgroundColor: "#FFF",
-    width: 160,
-    borderRadius: 25,
-    color: "#000",
-    height: 20,
-    paddingHorizontal: 5,
-    marginTop: 3
-  },
+      width: 160,
+      backgroundColor: "#fff",
+      borderRadius: 25,
+      color: "#000",
+      height: 20,
+      paddingHorizontal: 5,
+      marginTop: 3,
+    },
 
   selecionarData: {
     backgroundColor: "#fff",
