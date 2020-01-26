@@ -1,7 +1,9 @@
 export default class CompraSchema {
     static schema = {
         name: 'Compra',
-        properties: { 
+        primaryKey: 'id',
+        properties: {
+            id: 'int',
             comprador: 'string',
             cartao: 'string',
             produto: 'string',
@@ -9,7 +11,8 @@ export default class CompraSchema {
             parcelas: 'int',
             dataCompra: 'date',
             primeiraPrestacao: 'date',
-            ultimaPrestacao: 'date'
+            ultimaPrestacao: 'date',
+            valorPrestacao: 'float'
         }
     }
 }

@@ -1,21 +1,114 @@
 import React, { useState, useEffect } from 'react'
-import { View, Text, Picker, StyleSheet, TextInput, TouchableOpacity, ScrollView } from 'react-native'
+import { View, Text, Picker, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from 'react-native'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import LinearGradient from 'react-native-linear-gradient'
-import styles from './styles'
+import { styles, estilos } from './styles'
+import getRealm from '~/services/realm'
+import { dateToString, pegarMes } from '~/Utils/tratarDatas'
 
-function Profile({navigation}) {
+const meses = {
+    "Janeiro": 0, "Fevereiro": 1, "Março": 2, "Abril": 3, "Maio": 4, "Junho": 5, "Julho": 6,
+    "Agosto": 7, "Setembro": 8, "Outubro": 9, "Novembro": 10, "Dezembro": 11
+}
+
+function Profile({ navigation }) {
     const [mes, setMes] = useState("none")
     const [total, setTotal] = useState(0.00)
     const [comprador, setComprador] = useState("")
+    const [compras, setCompras] = useState([])
 
-    async function loadCompras(Mes) {
+    async function excluirComprasPagas() {
         const realm = await getRealm()
-    
-        const data = realm.objects('Compra')
-        setCompras([...data].reverse())
-      }
-    
+        let regraExclusao = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+        const data = realm.objects('Compra').filtered('ultimaPrestacao < $0', regraExclusao)
+
+        if (data.length) {
+            realm.write(() => {
+                realm.delete(...data)
+            })
+        }
+    }
+
+    useEffect(() => {
+        excluirComprasPagas()
+    }, [])
+
+    function getMes(mes) {
+        if (new Date().getMonth() <= meses[mes]) {
+            return new Date(new Date().getFullYear(), meses[mes], 15)
+        } else {
+            return new Date(new Date().getFullYear() + 1, meses[mes], 15)
+        }
+    }
+
+    function alertSelecioneMes() {
+        Alert.alert(
+            'Aviso',
+            'Selecione o mês',
+            [
+                {
+                    text: 'OK', onPress: () => { }
+                },
+            ],
+            { cancelable: false },
+        )
+    }
+
+    function alertSelecioneComprador() {
+        Alert.alert(
+            'Aviso',
+            'Selecione o Comprador',
+            [
+                {
+                    text: 'OK', onPress: () => { }
+                },
+            ],
+            { cancelable: false },
+        )
+    }
+
+
+    async function loadCompras(comprador, mes) {
+        if (mes == 'none') {
+            alertSelecioneMes()
+        } else if (!comprador) {
+            alertSelecioneComprador()
+        } else {
+            const dataPrestacao = getMes(mes)
+            const realm = await getRealm()
+            const data = realm.objects('Compra')
+                .filtered('comprador CONTAINS[c] $0', comprador)
+                .filtered('primeiraPrestacao <= $0', dataPrestacao)
+                .filtered('ultimaPrestacao >= $0', dataPrestacao)
+                .sorted('id', false)
+            let somaTodasCompras = 0
+
+            data.forEach(compra => somaTodasCompras += compra.valorPrestacao)
+            setTotal(somaTodasCompras)
+            setCompras([...data])
+        }
+    }
+
+
+    function mostrarComprasBuscadas(compra) {
+        return (
+            <View
+                key={compra.id}
+                style={styles.compra}>
+                <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>{compra.comprador}</Text></Text>
+                <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>{compra.cartao}</Text></Text>
+                <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>{compra.produto}</Text></Text>
+                <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ {compra.valor}</Text></Text>
+                <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>{compra.parcelas}</Text></Text>
+                <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>{dateToString(compra.dataCompra)}</Text></Text>
+                <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>{pegarMes(compra.primeiraPrestacao)}</Text></Text>
+                <Text style={styles.produto}>Última Parcela: <Text style={styles.produtoVendido}>{pegarMes(compra.ultimaPrestacao)}</Text></Text>
+                <Text style={styles.produto}>Valor da Prestação: <Text style={styles.produtoVendido}>R${compra.valorPrestacao.toFixed(2)}</Text></Text>
+
+            </View>
+        )
+    }
+
     return (
         <LinearGradient colors={["#e2a79f", "#fa7f72"]} style={{ flex: 1 }}>
             <View style={estilos.selecionarMes}>
@@ -72,88 +165,17 @@ function Profile({navigation}) {
                     value={comprador}
                     onChangeText={setComprador}
                 ></TextInput>
-                <TouchableOpacity>
+                <TouchableOpacity onPress={() => {
+                    loadCompras(comprador, mes)
+                }}>
                     <Icon name="search" size={20} color={"#000"} style={estilos.botaoBuscar}></Icon>
                 </TouchableOpacity>
             </View>
 
             <ScrollView style={styles.compras}>
-                <View style={styles.compra}>
-                    <View style={styles.botoesCompra}>
-                        <TouchableOpacity style={styles.botoesModificarCompra} onPress={() => {
-                            console.log("oi")
-                        }}>
-                            <Icon name="edit" size={14} color="#084d6e"></Icon>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.botoesModificarCompra}>
-                            <Icon name="delete" size={14} color="#084d6e"></Icon>
-                        </TouchableOpacity>
-                    </View>
-                    <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-                    <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-                    <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-                    <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-                    <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-                    <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-                    <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-                </View>
-
-                <View style={styles.compra}>
-                    <View style={styles.botoesCompra}>
-                        <TouchableOpacity style={styles.botoesModificarCompra} onPress={() => {
-                            console.log("oi")
-                        }}>
-                            <Icon name="edit" size={12} color="#084d6e"></Icon>
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.botoesModificarCompra}>
-                            <Icon name="delete" size={12} color="#084d6e"></Icon>
-                        </TouchableOpacity>
-                    </View>
-                    <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-                    <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-                    <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-                    <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-                    <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-                    <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
-                    <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-                    <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-                </View>
-
-
-                <View style={styles.compra}>
-                    <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-                    <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-                    <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-                    <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-                    <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-                    <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
-                    <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-                    <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-                </View>
-
-                <View style={styles.compra}>
-                    <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-                    <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-                    <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-                    <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-                    <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-                    <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
-                    <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-                    <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-                </View>
-
-                <View style={styles.compra}>
-                    <Text style={styles.produto}>Comprador: <Text style={styles.produtoVendido}>Mamãe</Text></Text>
-                    <Text style={styles.produto}>Cartão: <Text style={styles.produtoVendido}>Hipercard</Text></Text>
-                    <Text style={styles.produto}>Produto: <Text style={styles.produtoVendido}>Ferro de passar</Text></Text>
-                    <Text style={styles.produto}>Valor: <Text style={styles.produtoVendido}>R$ 250</Text></Text>
-                    <Text style={styles.produto}>Parcelas: <Text style={styles.produtoVendido}>5</Text></Text>
-                    <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>Janeiro</Text></Text>
-                    <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>22/05/2020</Text></Text>
-                    <Text style={styles.produto}>5 parcelas de 50, primera em Janeiro</Text>
-                </View>
+                {compras.map(mostrarComprasBuscadas)}
             </ScrollView>
-            <Text style={estilos.total}>Total: R${total.toFixed(2)}</Text>
+            <Text style={estilos.total}>Total: R${Number.parseFloat(total).toFixed(2)}</Text>
             <TouchableOpacity onPress={() => {
                 navigation.navigate('Main')
             }} style={estilos.botaoHome}>
@@ -163,90 +185,5 @@ function Profile({navigation}) {
     )
 }
 
-const estilos = StyleSheet.create({
-    selecionarMes: {
-        display: "flex",
-        flexDirection: "row",
-        alignItems: "center",
-        borderBottomColor: "#000",
-        elevation: 2,
-    },
-
-    cabecalhoMes: {
-        fontSize: 18,
-        fontWeight: "bold",
-        marginLeft: 12
-    },
-
-    meses: {
-        flex: 1,
-        width: 80,
-        marginTop: 2
-    },
-    buscarComprador: {
-        backgroundColor: "#fff",
-        color: "#000",
-        flex: 1,
-        borderRadius: 20,
-        paddingHorizontal: 15,
-        height: 40
-    },
-    formComprador: {
-        position: "absolute",
-        display: "flex",
-        flexDirection: "row",
-        top: 60.
-
-    },
-    botaoBuscar: {
-        backgroundColor: "#fff",
-        borderRadius: 20,
-        padding: 5,
-        marginHorizontal: 5,
-        top: 5
-    },
-
-
-    compras: {
-        display: "flex",
-        flexDirection: "column",
-        top: 50,
-        flex: 1,
-        marginBottom: 50
-    },
-
-    compra: {
-        display: "flex",
-        flexDirection: "column",
-        alignSelf: "center",
-        borderColor: "#000",
-        elevation: 2,
-        alignItems: "stretch",
-        paddingVertical: 7,
-        marginBottom: 10,
-        flex: 1,
-    },
-
-    total: {
-        fontSize: 22,
-        backgroundColor: "#fff",
-        position: "absolute",
-        bottom: 35,
-        right: 5,
-        borderRadius: 25,
-        paddingHorizontal: 10
-    },
-
-    botaoHome: {
-        position: "absolute",
-        bottom: 30,
-        left: 10,
-        backgroundColor: "#fff",
-        borderRadius: 20,
-        padding: 5,
-        zIndex: 10
-
-    }
-})
 
 export default Profile

@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, Picker } from 'react-native'
+import { ScrollView, View, Text, StyleSheet, TextInput, TouchableOpacity, Dimensions, Picker, Alert } from 'react-native'
 import LinearGradient from 'react-native-linear-gradient'
 import Icon from 'react-native-vector-icons/MaterialIcons'
 import Modal from 'react-native-modal'
 import DateTimerPicker from '@react-native-community/datetimepicker'
-import styles from './styles'
+import { styles, estilos, addCompra } from './styles'
 import getRealm from '~/services/realm'
-import { dateToString, stringToDate } from '~/Utils/tratarDatas'
-import {primeiraPrestacao, ultimaPrestacao, pegarMes} from '~/pages/Pagamento/parcelas'
-
-// import { Container } from './styles';
+import { dateToString, pegarMes } from '~/Utils/tratarDatas'
+import { primeiraPrestacao, ultimaPrestacao } from '~/pages/Pagamento/parcelas'
 
 function Main({ navigation }) {
   const [visible, setVisible] = useState(false)
@@ -27,12 +25,31 @@ function Main({ navigation }) {
     setVisible(true)
   }
 
+
+  async function buscarComprasComprador(comprador) {
+    const realm = await getRealm()
+    const data = realm.objects('Compra').sorted('id', false).filtered(`comprador CONTAINS[c] "${comprador}"`)
+    let qtdElementos = 6
+
+    if (data.length < 6) {
+      qtdElementos = data.length
+    }
+
+    setCompras([...data.slice(data.length - qtdElementos, data.length)])
+  }
+
   async function loadCompras() {
     const realm = await getRealm()
+    const quantElementos = realm.objects('Compra').length
+    let reduzir = 6
 
-    const data = realm.objects('Compra').slice(realm.objects('Compra').length - 6, realm.objects('Compra').length)
-    console.log(data)
-    setCompras([...data].reverse())
+    if (quantElementos < 6) {
+      reduzir = quantElementos
+    }
+
+    const data = realm.objects('Compra').sorted('id', false).slice(realm.objects('Compra').length - reduzir, realm.objects('Compra').length)
+    console.log(data);
+    setCompras([...data])
   }
 
   useEffect(() => {
@@ -48,22 +65,53 @@ function Main({ navigation }) {
       parcelas,
       dataCompra,
       primeiraPrestacao: primeiraPrestacao(dataCompra),
-      ultimaPrestacao: ultimaPrestacao(dataCompra, parcelas)
+      ultimaPrestacao: ultimaPrestacao(primeiraPrestacao(dataCompra), parcelas),
+      valorPrestacao: (valor / parcelas).toFixed(2)
     }
-
     return compra
+  }
+
+
+
+  async function excluirCompra(idCompra) {
+    const realm = await getRealm()
+    const compra = realm.objects('Compra').filtered('id = $0', idCompra)
+
+    Alert.alert(
+      'Confirmar exclusão',
+      'Deseja excluir essa compra?',
+      [
+        {
+          text: 'Cancel',
+          onPress: () => { },
+          style: 'cancel',
+        },
+        {
+          text: 'OK', onPress: () => {
+            realm.write(() => {
+              realm.delete(compra)
+            })
+            if (buscarComprador) {
+              buscarComprasComprador(buscarComprador)
+            } else {
+              loadCompras()
+            }
+          }
+        },
+      ],
+      { cancelable: false },
+    )
   }
 
   function mostrarCompras(compra) {
     return (
-      <View style={styles.compra}>
+      <View
+        key={compra.id}
+        style={styles.compra}>
         <View style={styles.botoesCompra}>
           <TouchableOpacity style={styles.botoesModificarCompra} onPress={() => {
-            console.log("oi")
+            excluirCompra(compra.id)
           }}>
-            <Icon name="edit" size={14} color="#084d6e"></Icon>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.botoesModificarCompra}>
             <Icon name="delete" size={14} color="#084d6e"></Icon>
           </TouchableOpacity>
         </View>
@@ -75,11 +123,14 @@ function Main({ navigation }) {
         <Text style={styles.produto}>Data da Compra: <Text style={styles.produtoVendido}>{dateToString(compra.dataCompra)}</Text></Text>
         <Text style={styles.produto}>Primeira Parcela: <Text style={styles.produtoVendido}>{pegarMes(compra.primeiraPrestacao)}</Text></Text>
         <Text style={styles.produto}>Última Parcela: <Text style={styles.produtoVendido}>{pegarMes(compra.ultimaPrestacao)}</Text></Text>
+        <Text style={styles.produto}>Valor da Prestação: <Text style={styles.produtoVendido}>R$: {(compra.valorPrestacao).toFixed(2)}</Text></Text>
+
       </View>
     )
   }
 
   async function saveCompra() {
+
     const compra = criarCompra()
     const data = {
       comprador: compra.comprador,
@@ -89,10 +140,18 @@ function Main({ navigation }) {
       parcelas: compra.parcelas,
       dataCompra: compra.dataCompra,
       primeiraPrestacao: compra.primeiraPrestacao,
-      ultimaPrestacao: compra.ultimaPrestacao
+      ultimaPrestacao: compra.ultimaPrestacao,
+      valorPrestacao: Number.parseFloat(compra.valorPrestacao)
     }
 
     const realm = await getRealm()
+
+    if (!realm.objects('Compra').length) {
+      data.id = 1
+    } else {
+      const ultimoElemento = realm.objects('Compra').sorted('id', false).slice(realm.objects('Compra').length - 1, realm.objects('Compra').length)
+      data.id = ultimoElemento.shift().id + 1
+    }
 
     realm.write(() => {
       realm.create('Compra', data)
@@ -139,7 +198,9 @@ function Main({ navigation }) {
           value={buscarComprador}
           onChangeText={setBuscarComprador}
         ></TextInput>
-        <TouchableOpacity>
+        <TouchableOpacity onPress={() => {
+          buscarComprasComprador(buscarComprador)
+        }}>
           <Icon name="search" size={20} color={"#000"} style={estilos.botaoBuscar}></Icon>
         </TouchableOpacity>
       </View>
@@ -215,7 +276,7 @@ function Main({ navigation }) {
               <TextInput
                 style={addCompra.inputDataCompra}
                 editable={false}
-                defaultValue={`${dataCompra.getDate()}/${dataCompra.getMonth() + 1}/${dataCompra.getFullYear()}`}></TextInput>
+                defaultValue={dateToString(dataCompra)}></TextInput>
               <TouchableOpacity
                 onPress={() => {
                   setShowCalendar(true)
@@ -270,139 +331,5 @@ function Main({ navigation }) {
     </LinearGradient>
   )
 }
-
-const estilos = StyleSheet.create({
-  linearGradient: {
-    flex: 1
-  },
-  buscarComprador: {
-    backgroundColor: "#fff",
-    color: "#000",
-    flex: 1,
-    borderRadius: 20,
-    paddingHorizontal: 15,
-    marginLeft: 5,
-    height: 40
-  },
-  formComprador: {
-    position: "absolute",
-    display: "flex",
-    flexDirection: "row",
-    top: 15
-  },
-  botaoBuscar: {
-    backgroundColor: "#fff",
-    borderRadius: 20,
-    padding: 5,
-    marginTop: 5,
-    marginHorizontal: 5,
-  },
-
-  cabecalho: {
-    top: 40,
-    fontSize: 20,
-    color: "#084d8e",
-    textAlign: "center",
-    marginTop: 30
-  },
-  bottomButtons: {
-    display: "flex",
-    flexDirection: "row",
-    position: "absolute",
-    right: 10,
-    bottom: 30,
-    borderRadius: 25,
-  },
-
-  botoesFinais: {
-    backgroundColor: "#fff",
-    borderRadius: 25,
-    padding: 2,
-    marginLeft: 7
-  },
-})
-
-const addCompra = StyleSheet.create({
-  cabecalho: {
-    fontSize: 26,
-    textAlign: "center",
-    top: 10
-  },
-
-  caixaPrincipal: {
-    marginTop: (Dimensions.get('window').height / 4) - 20,
-    maxHeight: 340,
-  },
-
-  selecionarCartao: {
-    height: 25,
-    width: 200,
-  },
-
-  formInformacao: {
-    display: "flex",
-    flexDirection: "row",
-  },
-
-  containerInformacoes: {
-    display: "flex",
-    flexDirection: "column",
-    top: 30,
-    marginLeft: 10
-  },
-
-  chaveCompra: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 8
-  },
-
-  dataCompra: {
-    width: 20,
-    height: 100,
-  },
-
-  inputCompra: {
-      width: 160,
-      backgroundColor: "#fff",
-      borderRadius: 25,
-      color: "#000",
-      height: 20,
-      paddingHorizontal: 5,
-      marginTop: 3,
-    },
-
-  selecionarData: {
-    backgroundColor: "#fff",
-    marginLeft: 15,
-    marginTop: 2,
-    borderRadius: 20,
-    padding: 7,
-  },
-
-  formBotoesFinais: {
-    display: "flex",
-    flexDirection: "row",
-    position: "absolute",
-    bottom: 20,
-    right: 10,
-    zIndex: 2
-  },
-
-  botoesFinais: {
-    backgroundColor: "#fff",
-    padding: 8,
-    borderRadius: 20,
-    marginLeft: 10
-  },
-
-  inputDataCompra: {
-    color: "#000",
-    top: 0,
-    padding: 0,
-    marginTop: 0
-  }
-})
-
 
 export default Main
